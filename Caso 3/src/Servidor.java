@@ -8,8 +8,8 @@ public class Servidor extends Thread {
 
     public Servidor() throws NoSuchAlgorithmException {
 
-        KeyPairGenerator generator = KeyPairGenerator.getInstance("AES");
-        generator.initialize(256);
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+        generator.initialize(1024);
         KeyPair keyPair = generator.generateKeyPair();
         this.publica = keyPair.getPublic();
         this.privada = keyPair.getPrivate();
@@ -32,6 +32,13 @@ public class Servidor extends Thread {
     public byte[] resolverReto(Long reto, CifradoAsimetrico cifrador) {
         byte[] retoCifrado = cifrador.cifrar(privada, reto);
         return retoCifrado;
+    }
+
+    public static byte[] generateRandomBytes(int length) {
+        Random random = new Random();
+        byte[] randomBytes = new byte[length];
+        random.nextBytes(randomBytes);
+        return randomBytes;
     }
 
 }
