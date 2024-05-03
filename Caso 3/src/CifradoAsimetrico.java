@@ -6,13 +6,11 @@ public class CifradoAsimetrico {
 
     }
 
-    public byte[] cifrar(Key llave, Long reto) {
+    public byte[] cifrar(Key llave, String mensaje) {
         byte[] textoCifrado;
-
         try {
             Cipher cifrador = Cipher.getInstance("RSA");
-            String texto = String.valueOf(reto);
-            byte[] textoClaro = texto.getBytes();
+            byte[] textoClaro = mensaje.getBytes();
             cifrador.init(Cipher.ENCRYPT_MODE, llave);
             textoCifrado = cifrador.doFinal(textoClaro);
             return textoCifrado;

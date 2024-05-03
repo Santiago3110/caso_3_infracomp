@@ -1,6 +1,7 @@
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.util.*;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
@@ -19,12 +20,16 @@ public class Cliente extends Thread {
 
     // LLaves
 
+    // Extras
+    private BigInteger x;
+
     public Cliente() {
 
         SecureRandom random = new SecureRandom();
         this.reto = random.nextLong(10000);
         this.clave = generateRandomString(8);
         this.consulta = random.nextInt();
+
     }
 
     public String verificarReto(byte[] retoCifrado, CifradoAsimetrico cifrador, PublicKey llavePublica) {
@@ -39,6 +44,25 @@ public class Cliente extends Thread {
         } else {
             return "ERROR";
         }
+    }
+
+    public String verificarDH(byte[] infoDHCifrado, BigInteger p, BigInteger g, BigInteger gx, byte[] iv,
+            PublicKey llavePublica, CifradoAsimetrico cifrador) {
+        byte[] infoDescifrada = cifrador.descifrar(llavePublica, retoCifrado);
+        String cadenaOriginal = new String(descifrado, StandardCharsets.UTF_8);
+        System.out.println("Cadena original: " + cadenaOriginal);
+        String[] data = cadenaOriginal.split("$");
+        // Comparación p
+        if (!data[0].equals(p.toString())) {
+            return "ERROR";
+        }
+        if (!data[1].equals(g.toString())) {
+            return "ERROR";
+        }
+        if (!data[2].equals(gx.toString())) {
+            return "ERROR";
+        }
+        return "OK";
     }
 
     public Long getReto() {
@@ -70,5 +94,11 @@ public class Cliente extends Thread {
         }
 
         return stringBuilder.toString();
+    }
+
+    public BigInteger generarBigIntegerAleatorio() {
+        SecureRandom secureRandom = new SecureRandom();
+        this.numeroAleatorio = new BigInteger(1024, new java.security.SecureRandom());
+        return numeroAleatorio;
     }
 }

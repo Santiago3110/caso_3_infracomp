@@ -1,8 +1,13 @@
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.math.BigInteger;
 
 public class App {
 
+    static CifradoSimetrico cifradoSimetrico = new CifradoSimetrico();
     static CifradoAsimetrico cifrador = new CifradoAsimetrico();
+    static DiffieHellman diffieHellman = new DiffieHellman();
 
     public static void main(String[] args) throws Exception {
 
@@ -34,6 +39,30 @@ public class App {
 
                     if (descifrado.equals("OK")) {
                         System.out.println("Comunicación exitosa.");
+
+                        // Diffie Hellman datos
+                        System.out.println("Sacando datos DH");
+                        BigInteger p = diffieHellman.getP();
+                        BigInteger g = diffieHellman.getG();
+                        byte[] iv = diffieHellman.generarIV();
+
+                        System.out.println("generando datos DH");
+                        String infoDH = servidor.generarDatosDH(p, g);
+                        System.out.println("Datos DH: " + infoDH);
+
+                        System.out.println("Cifrando datos DH");
+                        byte[] infoDHCifrada = servidor.cifrar(infoDH, cifrador);
+
+                        System.out.println("Verificando datos DH");
+                        String respuestaVerificacionDH = clienteUnico.verificarDH(infoDHCifrada, p, g,
+                                servidor.getGX(), iv, servidor.getPublicKey(), cifrador);
+
+                        if (respuestaVerificacionDH.equals("OK")) {
+                            System.out.println("Verificación exitosa de DH.");
+
+                        } else if (respuestaVerificacionDH.equals("ERROR")) {
+                            System.out.println("Fallo en la verficacion DH.");
+                        }
 
                     } else if (descifrado.equals("ERROR")) {
                         System.out.println("Fallo en la comunicación.");
