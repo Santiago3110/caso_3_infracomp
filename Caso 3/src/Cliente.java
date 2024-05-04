@@ -1,7 +1,18 @@
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.util.*;
+
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import javax.sound.sampled.BooleanControl;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.math.BigInteger;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
@@ -16,12 +27,18 @@ public class Cliente extends Thread {
 
     // Sesion
     private String login;
-    private String clave; // C
+    private String clave;
+
+    // C
+    private BigInteger gy;
+    private BigInteger y;
 
     // LLaves
+    private SecretKey secretKey;
+    private SecretKey secretKeyHMAC;
 
     // Extras
-    private BigInteger x;
+    private BigInteger GXY;
 
     public Cliente() {
 
@@ -30,41 +47,76 @@ public class Cliente extends Thread {
         this.clave = generateRandomString(8);
         this.consulta = random.nextInt();
 
+        this.login = UUID.randomUUID().toString();
+        this.clave = generarClaveAleatoria();
+
     }
 
-    public String verificarReto(byte[] retoCifrado, CifradoAsimetrico cifrador, PublicKey llavePublica) {
+    public boolean verificarReto(PublicKey llavePublica, byte[] firmaByte, Cifrado cifrador) {
+        try {
+            String retoString = String.valueOf(reto);
+            Boolean respuesta = cifrador.verificarFirma(llavePublica, retoString, firmaByte);
+            return respuesta;
 
-        byte[] descifrado = cifrador.descifrar(llavePublica, retoCifrado);
-
-        String retoDescifrado = new String(descifrado, StandardCharsets.UTF_8);
-        String retoString = String.valueOf(this.reto);
-
-        if (retoDescifrado.equals(retoString)) {
-            return "OK";
-        } else {
-            return "ERROR";
+        } catch (Exception e) {
+            return false;
         }
+
     }
 
-    public String verificarDH(byte[] infoDHCifrado, BigInteger p, BigInteger g, BigInteger gx, byte[] iv,
-            PublicKey llavePublica, CifradoAsimetrico cifrador) {
-        byte[] infoDescifrada = cifrador.descifrar(llavePublica, retoCifrado);
-        String cadenaOriginal = new String(descifrado, StandardCharsets.UTF_8);
-        System.out.println("Cadena original: " + cadenaOriginal);
-        String[] data = cadenaOriginal.split("$");
-        // Comparación p
-        if (!data[0].equals(p.toString())) {
-            return "ERROR";
+    public Boolean verificarFirma(byte[] firmaPGGX, BigInteger p, BigInteger g, BigInteger gx, byte[] iv,
+            PublicKey llavePublica, Cifrado cifrador) {
+
+        String data = p + "$";
+        data += g;
+        data += "$";
+        data += gx;
+        try {
+            Boolean respuesta = cifrador.verificarFirma(llavePublica, data, firmaPGGX);
+            return respuesta;
+        } catch (Exception e) {
+            System.out.println("La excepción dada fue: " + e);
+            return null;
         }
-        if (!data[1].equals(g.toString())) {
-            return "ERROR";
-        }
-        if (!data[2].equals(gx.toString())) {
-            return "ERROR";
-        }
-        return "OK";
+
     }
 
+    public BigInteger generarGY(BigInteger p, BigInteger g, BigInteger gx) {
+        this.y = gx.mod(p);
+        this.gy = g.pow(this.y.intValue());
+        return this.gy;
+    }
+
+    public void generarGXY(BigInteger gx) {
+        this.GXY = gx.pow(this.y.intValue());
+    }
+
+    public void generarLLaves() throws NoSuchAlgorithmException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-512");
+        digest.update(GXY.toString().getBytes());
+        byte[] hash = digest.digest();
+        int mitad = hash.length / 2;
+        byte[] primeraMitad = Arrays.copyOfRange(hash, 0, mitad);
+        byte[] segundaMitad = Arrays.copyOfRange(hash, mitad, hash.length);
+
+        byte[] claveCifrado = Arrays.copyOf(primeraMitad, 32);
+        byte[] claveHMAC = Arrays.copyOf(segundaMitad, 32);
+
+        this.secretKey = new SecretKeySpec(claveCifrado, "AES");
+        this.secretKeyHMAC = new SecretKeySpec(claveHMAC, "AES");
+    }
+
+    public byte[] cifrarLogin(String login, Cifrado cifrador) {
+        byte[] dataCifrado = cifrador.cifrar(this.secretKey, login);
+        return dataCifrado;
+    }
+
+    public byte[] cifrarClave(String clave, Cifrado cifrador) {
+        byte[] dataCifrado = cifrador.cifrar(this.secretKey, clave);
+        return dataCifrado;
+    }
+
+    // GETTERS
     public Long getReto() {
         return this.reto;
     }
@@ -100,5 +152,14 @@ public class Cliente extends Thread {
         SecureRandom secureRandom = new SecureRandom();
         this.numeroAleatorio = new BigInteger(1024, new java.security.SecureRandom());
         return numeroAleatorio;
+    }
+
+    private String generarClaveAleatoria() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 8; i++) {
+            char randomChar = (char) ('a' + Math.random() * ('z' - 'a' + 1));
+            sb.append(randomChar);
+        }
+        return sb.toString();
     }
 }
